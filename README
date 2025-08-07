@@ -64,4 +64,5 @@ PRUNE_OLD_COPIES = Set to 1 to prune old versions of files on remote server or 0
 
 OLD_COPIES_MAX_AGE =  Max age of old copies of files before pruning (in days).
 
-To perform the backups, run: python backup.py.
+To perform the backups, run: python FileCryptBackup.py
+
