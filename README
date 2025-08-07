@@ -1,0 +1,67 @@
+I wrote this FileCryptBackup python script to perform secure "incremental" backups of files from my Windows laptop to a remote Linux server, thus allowing me to recover the latest versions of files in the event of laptop loss, theft, failure, etc.
+
+In particular, I wanted all files to be individually encrypted before transfer such that the files on the remote server would not be compromised even if the remote server itself became compromised. Thus, standard mirroring utilities such as rsync or git were ill-suited for this purpose; or, at least, I couldn't figure out a way to have them to sync directories while individually encrypting files before transfer. Plus, I wanted to practice python because it's not one of the languages I use on a daily basis (keep that in mind when reviewing the code and please share your suggestions).
+
+The script will recursively backup / mirror a local folder to a remote Linux server via SSH, individually encrypting each file with a public GPG key before uploading. It compares the local file structure to that of the remote server and only uploads modified files based on timestamps, i.e. if a local copy of a file is newer than the encrypted version on the remote server, the file will be encrypted locally and then uploaded to the remote server. Optionally, older versions of files will be renamed/archived on the local server, to assist in recovery of old versions of files.
+
+Importantly, a post-upload checksum validation check is performed for each file. I did this to help prevent remote files from being overwritten with a corrupted version in the event of a data transfer error.
+
+The script was written for my specific needs and will only work when backing up to a Linux/BSD server because it uses the "find" utility on the remote server to rapidly create a list of files for comparative purposes. I wrote the script to back up from my Windows machine to Linux. Some modification will be required for anyone who wants it to work with a different combination of machines.
+
+In my case, I run this script run hourly via Task Scheduler on my local Windows machine. If you use Task Scheduler I highly recommend allowing only 1 single instance to be run at a time, especially if you want to run the script at more frequent intervals.
+
+-------------------------
+LOGICAL STEPS PERFORMED:
+-------------------------
+1. Generate list of local files.
+2. Generate list of files on remote server.
+3. Compare the two file lists.
+4. For each local file that does not have a corresponding encrypted version on the remote server:
+	a) Check that the local file is not in one of the EXCLUDE_DIRS.
+	b) Check that the local file is not larger than MAX_FILE_SIZE.
+	c) Encrypt the local file, creating a temporary .gpg file for transfer.
+	d) Upload .gpg file via SSH to a temporary .partial_upload file on remote server.
+	e) Validate checksum of uploaded remote file against the local .gpg file.
+	f) Rename prior remote version of file (if KEEP_OLD_COPIES = 1).
+	g) Rename remote .partial_upload to .gpg.
+	h) Remove the local temporary .gpg encrypted file.
+5. Delete remote files / copies older than OLD_COPIES_MAX_AGE if they no longer exist locally (if PRUNE_OLD_COPIES = 1).
+
+-------------------------
+USING THE SCRIPT:
+-------------------------
+First, generate a GPG public/secret key-pair. The public key is used to encrypt the files, and you will keep the secret/private key to decrypt any files you pull down from the remote server.
+
+You will also need a username and SSH key to log into the server.
+
+Edit the following constants at the top of the script according to your needs:
+
+LOG_FILE = Path of local activity log file (for auditing).
+
+LOCAL_DIR = Local file path to back up to remote server.
+
+REMOTE_DIR = Remote file path into which files will be backed up.
+
+MAX_FILE_SIZE = Max size of files to backup (pre-encryption size in Bytes)
+
+EXCLUDE_DIRS = Set of local file paths to exclude from backups
+
+GPG_PUBLIC_KEY_FILE = The public GPG key to use to encrypt files.
+
+GPG_RECIPIENT = The gpg recipient address specified when you created the GPG keys.
+
+GPG_BINARY = Path to the GPG binary on your local machine (used for encryption).
+
+SSH_HOST = The SSH remote host to which we will connect.
+
+SSH_USER = Account username on SSH_HOST.
+
+SSH_KEY = Path to the SSH key file for SSH_USER.
+
+KEEP_OLD_COPIES = Set to 1 if you want to keep old versions/copies of files or 0 to disable.
+
+PRUNE_OLD_COPIES = Set to 1 to prune old versions of files on remote server or 0 to keep forever.
+
+OLD_COPIES_MAX_AGE =  Max age of old copies of files before pruning (in days).
+
+To perform the backups, run: python backup.py.
